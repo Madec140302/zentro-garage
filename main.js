@@ -1,1026 +1,818 @@
+// ============================================================
+// ZENTRO GARAGE
+// main.js - Version complète
+// ============================================================
+
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
+// ============================================================
+// CONFIGURATION
+// ============================================================
 
-/* =========================================================
-   SCÈNE
-========================================================= */
+const CAR_MODEL_PATH = "./assets/cars/GolfR.glb";
 
-const scene = new THREE.Scene();
+// ============================================================
+// VARIABLES
+// ============================================================
 
-scene.background = new THREE.Color(0x07090c);
+let scene;
+let camera;
+let renderer;
+let controls;
 
-scene.fog = new THREE.Fog(
-    0x07090c,
-    25,
-    90
-);
+let car = null;
+let carBodyMaterials = [];
 
+let clock = new THREE.Clock();
 
-/* =========================================================
-   CAMÉRA
-========================================================= */
+let targetCarColor = 0x050505;
 
-const camera = new THREE.PerspectiveCamera(
-    55,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    200
-);
+let garageLights = [];
 
-camera.position.set(
-    10,
-    5,
-    12
-);
+const loadingScreen = document.getElementById("loadingScreen");
+const customizationPanel = document.getElementById("customizationPanel");
+const notification = document.getElementById("notification");
 
+// ============================================================
+// INITIALISATION
+// ============================================================
 
-/* =========================================================
-   RENDERER
-========================================================= */
+init();
+animate();
 
-const renderer =
-    new THREE.WebGLRenderer({
+// ============================================================
+// INIT
+// ============================================================
+
+function init() {
+    // --------------------------------------------------------
+    // SCÈNE
+    // --------------------------------------------------------
+
+    scene = new THREE.Scene();
+
+    scene.background = new THREE.Color(0x050608);
+
+    // --------------------------------------------------------
+    // CAMÉRA
+    // --------------------------------------------------------
+
+    camera = new THREE.PerspectiveCamera(
+        55,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+    );
+
+    camera.position.set(6, 3.2, 7);
+
+    // --------------------------------------------------------
+    // RENDERER
+    // --------------------------------------------------------
+
+    renderer = new THREE.WebGLRenderer({
         antialias: true,
+        alpha: false,
         powerPreference: "high-performance"
     });
 
-renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-);
+    renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio, 2)
+    );
 
-renderer.setPixelRatio(
-    Math.min(
-        window.devicePixelRatio,
-        1.5
-    )
-);
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
 
-renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-renderer.shadowMap.type =
-    THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-renderer.outputColorSpace =
-    THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
 
-renderer.toneMapping =
-    THREE.ACESFilmicToneMapping;
+    document.body.appendChild(renderer.domElement);
 
-renderer.toneMappingExposure = 1.15;
+    // --------------------------------------------------------
+    // CONTROLES
+    // --------------------------------------------------------
 
-document.body.appendChild(
-    renderer.domElement
-);
-
-
-/* =========================================================
-   CONTRÔLES CAMÉRA
-========================================================= */
-
-const controls =
-    new OrbitControls(
+    controls = new OrbitControls(
         camera,
         renderer.domElement
     );
 
-controls.enableDamping = true;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
 
-controls.dampingFactor = 0.06;
-
-controls.minDistance = 5;
-
-controls.maxDistance = 25;
-
-controls.maxPolarAngle =
-    Math.PI * 0.47;
-
-controls.target.set(
-    0,
-    1,
-    0
-);
-
-
-/* =========================================================
-   LUMIÈRES
-========================================================= */
-
-const hemisphere =
-    new THREE.HemisphereLight(
-        0xffffff,
-        0x10131a,
-        2
+    controls.target.set(
+        0,
+        1.1,
+        0
     );
 
-scene.add(hemisphere);
+    controls.minDistance = 3.5;
+    controls.maxDistance = 12;
 
+    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.minPolarAngle = 0.35;
 
-const mainLight =
-    new THREE.DirectionalLight(
+    controls.enablePan = false;
+
+    // --------------------------------------------------------
+    // LUMIÈRE
+    // --------------------------------------------------------
+
+    createLighting();
+
+    // --------------------------------------------------------
+    // GARAGE
+    // --------------------------------------------------------
+
+    createGarage();
+
+    // --------------------------------------------------------
+    // VOITURE
+    // --------------------------------------------------------
+
+    loadGolf();
+
+    // --------------------------------------------------------
+    // EVENEMENTS
+    // --------------------------------------------------------
+
+    setupUI();
+
+    window.addEventListener(
+        "resize",
+        onWindowResize
+    );
+}
+
+// ============================================================
+// ÉCLAIRAGE
+// ============================================================
+
+function createLighting() {
+
+    // Lumière générale
+    const ambientLight = new THREE.AmbientLight(
+        0xffffff,
+        1.5
+    );
+
+    scene.add(ambientLight);
+
+    // Lumière principale
+    const mainLight = new THREE.DirectionalLight(
         0xffffff,
         3
     );
 
-mainLight.position.set(
-    5,
-    12,
-    7
-);
+    mainLight.position.set(
+        4,
+        8,
+        5
+    );
 
-mainLight.castShadow = true;
+    mainLight.castShadow = true;
 
-mainLight.shadow.mapSize.width = 2048;
+    mainLight.shadow.mapSize.width = 2048;
+    mainLight.shadow.mapSize.height = 2048;
 
-mainLight.shadow.mapSize.height = 2048;
+    mainLight.shadow.camera.near = 0.1;
+    mainLight.shadow.camera.far = 30;
 
-scene.add(mainLight);
+    mainLight.shadow.camera.left = -10;
+    mainLight.shadow.camera.right = 10;
+    mainLight.shadow.camera.top = 10;
+    mainLight.shadow.camera.bottom = -10;
 
+    scene.add(mainLight);
 
-/* Lumières du garage */
+    // Lumière arrière
+    const backLight = new THREE.PointLight(
+        0x6b8cff,
+        18,
+        15
+    );
 
-function addGarageLight(
+    backLight.position.set(
+        -5,
+        4,
+        -5
+    );
+
+    scene.add(backLight);
+
+    garageLights.push(backLight);
+
+    // Lumières latérales
+    const leftLight = new THREE.PointLight(
+        0xffffff,
+        10,
+        12
+    );
+
+    leftLight.position.set(
+        -6,
+        4,
+        2
+    );
+
+    scene.add(leftLight);
+
+    garageLights.push(leftLight);
+
+    const rightLight = new THREE.PointLight(
+        0xffffff,
+        10,
+        12
+    );
+
+    rightLight.position.set(
+        6,
+        4,
+        2
+    );
+
+    scene.add(rightLight);
+
+    garageLights.push(rightLight);
+}
+
+// ============================================================
+// GARAGE
+// ============================================================
+
+function createGarage() {
+
+    // --------------------------------------------------------
+    // SOL
+    // --------------------------------------------------------
+
+    const floorGeometry =
+        new THREE.PlaneGeometry(
+            30,
+            30
+        );
+
+    const floorMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x111318,
+            roughness: 0.35,
+            metalness: 0.7
+        });
+
+    const floor =
+        new THREE.Mesh(
+            floorGeometry,
+            floorMaterial
+        );
+
+    floor.rotation.x = -Math.PI / 2;
+
+    floor.receiveShadow = true;
+
+    scene.add(floor);
+
+    // --------------------------------------------------------
+    // MUR ARRIÈRE
+    // --------------------------------------------------------
+
+    const wallMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x090b0f,
+            roughness: 0.8,
+            metalness: 0.15
+        });
+
+    const backWall =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                30,
+                10,
+                0.5
+            ),
+            wallMaterial
+        );
+
+    backWall.position.set(
+        0,
+        5,
+        -8
+    );
+
+    backWall.receiveShadow = true;
+
+    scene.add(backWall);
+
+    // --------------------------------------------------------
+    // MUR GAUCHE
+    // --------------------------------------------------------
+
+    const leftWall =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                0.5,
+                10,
+                16
+            ),
+            wallMaterial
+        );
+
+    leftWall.position.set(
+        -15,
+        5,
+        0
+    );
+
+    scene.add(leftWall);
+
+    // --------------------------------------------------------
+    // MUR DROIT
+    // --------------------------------------------------------
+
+    const rightWall =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                0.5,
+                10,
+                16
+            ),
+            wallMaterial
+        );
+
+    rightWall.position.set(
+        15,
+        5,
+        0
+    );
+
+    scene.add(rightWall);
+
+    // --------------------------------------------------------
+    // PLATEFORME
+    // --------------------------------------------------------
+
+    const platformGeometry =
+        new THREE.CylinderGeometry(
+            4,
+            4,
+            0.25,
+            64
+        );
+
+    const platformMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x181b21,
+            roughness: 0.3,
+            metalness: 0.8
+        });
+
+    const platform =
+        new THREE.Mesh(
+            platformGeometry,
+            platformMaterial
+        );
+
+    platform.position.y = 0.13;
+
+    platform.receiveShadow = true;
+    platform.castShadow = true;
+
+    scene.add(platform);
+
+    // --------------------------------------------------------
+    // ANNEAU LUMINEUX
+    // --------------------------------------------------------
+
+    const ringGeometry =
+        new THREE.RingGeometry(
+            3.5,
+            3.7,
+            64
+        );
+
+    const ringMaterial =
+        new THREE.MeshBasicMaterial({
+            color: 0x3b82ff,
+            side: THREE.DoubleSide
+        });
+
+    const ring =
+        new THREE.Mesh(
+            ringGeometry,
+            ringMaterial
+        );
+
+    ring.rotation.x = -Math.PI / 2;
+
+    ring.position.y = 0.27;
+
+    scene.add(ring);
+
+    // --------------------------------------------------------
+    // BANDES LUMINEUSES MURALES
+    // --------------------------------------------------------
+
+    createLightStrip(
+        -6,
+        3.5,
+        -7.7,
+        0x3b82ff
+    );
+
+    createLightStrip(
+        0,
+        3.5,
+        -7.7,
+        0xffffff
+    );
+
+    createLightStrip(
+        6,
+        3.5,
+        -7.7,
+        0x3b82ff
+    );
+
+    // --------------------------------------------------------
+    // PANNEAUX DÉCORATIFS
+    // --------------------------------------------------------
+
+    createGaragePanel(
+        -7,
+        2.5,
+        -7.65
+    );
+
+    createGaragePanel(
+        7,
+        2.5,
+        -7.65
+    );
+
+    // --------------------------------------------------------
+    // LOGO ZENTRO
+    // --------------------------------------------------------
+
+    createZentroLogo();
+}
+
+// ============================================================
+// BANDES LUMINEUSES
+// ============================================================
+
+function createLightStrip(
+    x,
+    y,
+    z,
+    color
+) {
+
+    const geometry =
+        new THREE.BoxGeometry(
+            4,
+            0.08,
+            0.08
+        );
+
+    const material =
+        new THREE.MeshBasicMaterial({
+            color: color
+        });
+
+    const strip =
+        new THREE.Mesh(
+            geometry,
+            material
+        );
+
+    strip.position.set(
+        x,
+        y,
+        z
+    );
+
+    scene.add(strip);
+}
+
+// ============================================================
+// PANNEAUX
+// ============================================================
+
+function createGaragePanel(
     x,
     y,
     z
 ) {
 
-    const light =
-        new THREE.PointLight(
-            0xffffff,
-            18,
-            16
+    const geometry =
+        new THREE.BoxGeometry(
+            3,
+            4,
+            0.12
         );
 
-    light.position.set(
-        x,
-        y,
-        z
-    );
-
-    scene.add(light);
-
-
-    const lamp =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                3,
-                0.04,
-                0.12
-            ),
-            new THREE.MeshBasicMaterial({
-                color: 0xffffff
-            })
-        );
-
-    lamp.position.set(
-        x,
-        y,
-        z
-    );
-
-    scene.add(lamp);
-}
-
-addGarageLight(-7, 7, -5);
-addGarageLight(0, 7, -5);
-addGarageLight(7, 7, -5);
-
-addGarageLight(-7, 7, 4);
-addGarageLight(0, 7, 4);
-addGarageLight(7, 7, 4);
-
-
-/* =========================================================
-   GARAGE
-========================================================= */
-
-const garage =
-    new THREE.Group();
-
-scene.add(garage);
-
-
-/* Sol */
-
-const floor =
-    new THREE.Mesh(
-        new THREE.PlaneGeometry(
-            50,
-            50
-        ),
+    const material =
         new THREE.MeshStandardMaterial({
-            color: 0x15181d,
-            roughness: 0.4,
-            metalness: 0.35
-        })
-    );
-
-floor.rotation.x =
-    -Math.PI / 2;
-
-floor.receiveShadow = true;
-
-garage.add(floor);
-
-
-/* Murs */
-
-function createWall(
-    x,
-    y,
-    z,
-    width,
-    height,
-    depth
-) {
-
-    const mesh =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                width,
-                height,
-                depth
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x101318,
-                roughness: 0.7,
-                metalness: 0.2
-            })
-        );
-
-    mesh.position.set(
-        x,
-        y,
-        z
-    );
-
-    mesh.receiveShadow = true;
-
-    garage.add(mesh);
-}
-
-createWall(
-    -13,
-    4,
-    0,
-    0.5,
-    8,
-    28
-);
-
-createWall(
-    13,
-    4,
-    0,
-    0.5,
-    8,
-    28
-);
-
-createWall(
-    0,
-    4,
-    -13,
-    26,
-    8,
-    0.5
-);
-
-
-/* Panneaux muraux */
-
-for (
-    let x = -10;
-    x <= 10;
-    x += 5
-) {
+            color: 0x101319,
+            metalness: 0.6,
+            roughness: 0.4
+        });
 
     const panel =
         new THREE.Mesh(
-            new THREE.BoxGeometry(
-                4.5,
-                6,
-                0.08
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x171b21,
-                roughness: 0.4,
-                metalness: 0.5
-            })
+            geometry,
+            material
         );
 
     panel.position.set(
         x,
-        3.5,
-        -12.7
+        y,
+        z
     );
 
-    garage.add(panel);
-}
-
-
-/* =========================================================
-   LOGO ZENTRO
-========================================================= */
-
-const signCanvas =
-    document.createElement("canvas");
-
-signCanvas.width = 1024;
-
-signCanvas.height = 256;
-
-const signContext =
-    signCanvas.getContext("2d");
-
-signContext.fillStyle =
-    "#0b0d11";
-
-signContext.fillRect(
-    0,
-    0,
-    1024,
-    256
-);
-
-signContext.fillStyle =
-    "#ffffff";
-
-signContext.font =
-    "900 120px Arial";
-
-signContext.textAlign =
-    "center";
-
-signContext.textBaseline =
-    "middle";
-
-signContext.fillText(
-    "ZENTRO",
-    512,
-    128
-);
-
-const signTexture =
-    new THREE.CanvasTexture(
-        signCanvas
-    );
-
-const sign =
-    new THREE.Mesh(
-        new THREE.PlaneGeometry(
-            8,
-            2
-        ),
-        new THREE.MeshBasicMaterial({
-            map: signTexture
-        })
-    );
-
-sign.position.set(
-    0,
-    5.5,
-    -12.4
-);
-
-garage.add(sign);
-
-
-/* =========================================================
-   PLATEFORME
-========================================================= */
-
-const platform =
-    new THREE.Mesh(
-        new THREE.CylinderGeometry(
-            5.5,
-            5.5,
-            0.2,
-            64
-        ),
-        new THREE.MeshStandardMaterial({
-            color: 0x0b0d11,
-            metalness: 0.7,
-            roughness: 0.25
-        })
-    );
-
-platform.position.y = 0.12;
-
-platform.receiveShadow = true;
-
-scene.add(platform);
-
-
-const platformRing =
-    new THREE.Mesh(
-        new THREE.RingGeometry(
-            5,
-            5.08,
-            64
-        ),
-        new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            side: THREE.DoubleSide
-        })
-    );
-
-platformRing.rotation.x =
-    -Math.PI / 2;
-
-platformRing.position.y =
-    0.23;
-
-scene.add(platformRing);
-
-
-/* =========================================================
-   VOITURE
-========================================================= */
-
-let car;
-
-const carGroup =
-    new THREE.Group();
-
-scene.add(carGroup);
-
-
-/* =========================================================
-   MODÈLE 3D
-========================================================= */
-
-const loader =
-    new GLTFLoader();
-
-
-/*
-    Quand tu auras un vrai fichier GLB,
-    place-le ici :
-
-    Actifs/Voitures/GolfR.glb
-*/
-
-loader.load(
-    "Actifs/Voitures/GolfR.glb",
-
-    function (gltf) {
-
-        car = gltf.scene;
-
-        car.scale.set(
-            2,
-            2,
-            2
-        );
-
-        car.position.set(
-            0,
-            0.2,
-            0
-        );
-
-        car.traverse(
-            function (object) {
-
-                if (
-                    object.isMesh
-                ) {
-
-                    object.castShadow =
-                        true;
-
-                    object.receiveShadow =
-                        true;
-
-                }
-
-            }
-        );
-
-        carGroup.add(
-            car
-        );
-
-        showNotification(
-            "GOLF R 2025 CHARGÉE"
-        );
-
-    },
-
-    undefined,
-
-    function () {
-
-        /*
-            Si GolfR.glb n'existe pas encore,
-            on utilise automatiquement
-            notre modèle provisoire.
-        */
-
-        createTemporaryGolf();
-
-        showNotification(
-            "MODELE 3D PROVISOIRE"
-        );
-
-    }
-);
-
-
-/* =========================================================
-   MODÈLE PROVISOIRE
-========================================================= */
-
-function createTemporaryGolf() {
-
-    car =
-        new THREE.Group();
-
-    carGroup.add(
-        car
-    );
-
-
-    const bodyMaterial =
-        new THREE.MeshPhysicalMaterial({
-            color: 0x08090b,
-            metalness: 0.82,
-            roughness: 0.18,
-            clearcoat: 1,
-            clearcoatRoughness: 0.08
-        });
-
-
-    /* Carrosserie */
-
-    const body =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                4.4,
-                0.85,
-                8.4
-            ),
-            bodyMaterial
-        );
-
-    body.position.y =
-        1.05;
-
-    body.castShadow = true;
-
-    car.add(body);
-
-
-    /* Capot */
-
-    const hood =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                4.1,
-                0.2,
-                2.4
-            ),
-            bodyMaterial
-        );
-
-    hood.position.set(
-        0,
-        1.5,
-        -2.7
-    );
-
-    car.add(hood);
-
-
-    /* Toit */
-
-    const roof =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                3.5,
-                0.3,
-                3.6
-            ),
-            new THREE.MeshPhysicalMaterial({
-                color: 0x030405,
-                metalness: 0.6,
-                roughness: 0.1
-            })
-        );
-
-    roof.position.set(
-        0,
-        1.85,
-        0.3
-    );
-
-    car.add(roof);
-
-
-    /* Vitres */
-
-    const glass =
-        new THREE.MeshPhysicalMaterial({
-            color: 0x0c1822,
-            roughness: 0.08,
-            metalness: 0.15,
-            transparent: true,
-            opacity: 0.75
-        });
-
-
-    const windshield =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                3.3,
-                0.08,
-                1.5
-            ),
-            glass
-        );
-
-    windshield.position.set(
-        0,
-        1.95,
-        -1
-    );
-
-    windshield.rotation.x =
-        -0.65;
-
-    car.add(windshield);
-
-
-    /* Roues */
-
-    createTemporaryWheel(
-        -2.25,
-        -2.5
-    );
-
-    createTemporaryWheel(
-        2.25,
-        -2.5
-    );
-
-    createTemporaryWheel(
-        -2.25,
-        2.5
-    );
-
-    createTemporaryWheel(
-        2.25,
-        2.5
-    );
-
-
-    /* Phares */
-
-    const headlight =
-        new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            emissive: 0xffffff,
-            emissiveIntensity: 8
-        });
-
-    createLight(
-        -1.3,
-        -4.22,
-        headlight
-    );
-
-    createLight(
-        1.3,
-        -4.22,
-        headlight
-    );
-
-
-    /* Feux arrière */
-
-    const rearLight =
-        new THREE.MeshStandardMaterial({
-            color: 0x300000,
-            emissive: 0xff0000,
-            emissiveIntensity: 5
-        });
-
-    createLight(
-        -1.3,
-        4.22,
-        rearLight
-    );
-
-    createLight(
-        1.3,
-        4.22,
-        rearLight
-    );
-
-
-    /* Spoiler */
-
-    const spoiler =
-        new THREE.Mesh(
-            new THREE.BoxGeometry(
-                3.8,
-                0.15,
-                0.45
-            ),
-            bodyMaterial
-        );
-
-    spoiler.position.set(
-        0,
-        2.05,
-        3.85
-    );
-
-    car.add(spoiler);
-
-
-    /* 4 sorties d'échappement */
-
-    const exhaustMaterial =
-        new THREE.MeshStandardMaterial({
-            color: 0x25282d,
-            metalness: 0.9,
-            roughness: 0.22
-        });
-
-    [
-        -1.35,
-        -0.45,
-        0.45,
-        1.35
-    ].forEach(
-        x => {
-
-            const exhaust =
-                new THREE.Mesh(
-                    new THREE.CylinderGeometry(
-                        0.18,
-                        0.18,
-                        0.3,
-                        20
-                    ),
-                    exhaustMaterial
-                );
-
-            exhaust.rotation.x =
-                Math.PI / 2;
-
-            exhaust.position.set(
-                x,
-                0.7,
-                4.3
+    scene.add(panel);
+
+    // lignes décoratives
+    for (
+        let i = -1;
+        i <= 1;
+        i++
+    ) {
+
+        const line =
+            new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    2.3,
+                    0.025,
+                    0.02
+                ),
+                new THREE.MeshBasicMaterial({
+                    color: 0x303640
+                })
             );
 
-            car.add(exhaust);
-
-        }
-    );
-}
-
-
-/* Roue provisoire */
-
-function createTemporaryWheel(
-    x,
-    z
-) {
-
-    const wheel =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                0.78,
-                0.78,
-                0.48,
-                32
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x030303,
-                roughness: 0.8
-            })
+        line.position.set(
+            x,
+            y + i * 0.7,
+            z - 0.08
         );
 
-    wheel.rotation.z =
-        Math.PI / 2;
-
-    wheel.position.set(
-        x,
-        0.7,
-        z
-    );
-
-    wheel.castShadow = true;
-
-    car.add(wheel);
-
-
-    const rim =
-        new THREE.Mesh(
-            new THREE.CylinderGeometry(
-                0.45,
-                0.45,
-                0.5,
-                24
-            ),
-            new THREE.MeshStandardMaterial({
-                color: 0x17191d,
-                metalness: 0.9,
-                roughness: 0.2
-            })
-        );
-
-    rim.rotation.z =
-        Math.PI / 2;
-
-    rim.position.set(
-        x,
-        0.7,
-        z
-    );
-
-    car.add(rim);
+        scene.add(line);
+    }
 }
 
+// ============================================================
+// LOGO ZENTRO
+// ============================================================
 
-/* Phares / feux */
+function createZentroLogo() {
 
-function createLight(
-    x,
-    z,
-    material
-) {
+    const canvas =
+        document.createElement("canvas");
 
-    const light =
+    canvas.width = 1024;
+    canvas.height = 256;
+
+    const ctx =
+        canvas.getContext("2d");
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    ctx.font =
+        "bold 150px Arial";
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillStyle = "#ffffff";
+
+    ctx.fillText(
+        "ZENTRO",
+        512,
+        128
+    );
+
+    const texture =
+        new THREE.CanvasTexture(
+            canvas
+        );
+
+    texture.colorSpace =
+        THREE.SRGBColorSpace;
+
+    const material =
+        new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true
+        });
+
+    const logo =
         new THREE.Mesh(
-            new THREE.BoxGeometry(
-                1.2,
-                0.18,
-                0.06
+            new THREE.PlaneGeometry(
+                6,
+                1.5
             ),
             material
         );
 
-    light.position.set(
-        x,
-        1.25,
-        z
+    logo.position.set(
+        0,
+        6,
+        -7.65
     );
 
-    car.add(light);
+    scene.add(logo);
 }
 
+// ============================================================
+// CHARGEMENT DE LA GOLF
+// ============================================================
 
-/* =========================================================
-   PERSONNALISATION
-========================================================= */
+function loadGolf() {
 
-function changeCarColor(
-    color
-) {
+    const loader =
+        new GLTFLoader();
 
-    if (!car) {
-        return;
-    }
+    console.log(
+        "ZENTRO : chargement de",
+        CAR_MODEL_PATH
+    );
 
-    car.traverse(
-        object => {
+    loader.load(
+
+        CAR_MODEL_PATH,
+
+        function(gltf) {
+
+            console.log(
+                "ZENTRO : Golf chargée avec succès !",
+                gltf
+            );
+
+            car = gltf.scene;
+
+            // ------------------------------------------------
+            // POSITION
+            // ------------------------------------------------
+
+            car.position.set(
+                0,
+                0.35,
+                0
+            );
+
+            // ------------------------------------------------
+            // TAILLE
+            // ------------------------------------------------
+
+            const box =
+                new THREE.Box3().setFromObject(
+                    car
+                );
+
+            const size =
+                new THREE.Vector3();
+
+            box.getSize(size);
+
+            console.log(
+                "Dimensions du modèle :",
+                size
+            );
+
+            // Taille cible approximative
+            const targetLength = 4.5;
+
+            const currentLength =
+                Math.max(
+                    size.x,
+                    size.z
+                );
 
             if (
-                object.isMesh &&
-                object.material &&
-                object.material.color
+                currentLength > 0
             ) {
 
-                /*
-                    On évite de modifier
-                    les vitres et pneus.
-                */
+                const scale =
+                    targetLength /
+                    currentLength;
 
-                const current =
-                    object.material.color;
-
-                if (
-                    current.r > 0.01 ||
-                    current.g > 0.01 ||
-                    current.b > 0.01
-                ) {
-
-                    object.material.color.set(
-                        color
-                    );
-
-                }
-
+                car.scale.setScalar(
+                    scale
+                );
             }
 
-        }
-    );
+            // ------------------------------------------------
+            // RECALCUL DE LA POSITION
+            // ------------------------------------------------
 
-    showNotification(
-        "CARROSSERIE MODIFIÉE"
-    );
-}
+            const newBox =
+                new THREE.Box3().setFromObject(
+                    car
+                );
 
+            const center =
+                new THREE.Vector3();
 
-document
-    .querySelectorAll(".color")
-    .forEach(
-        button => {
+            newBox.getCenter(center);
 
-            button.addEventListener(
-                "click",
-                () => {
+            car.position.x -= center.x;
+            car.position.z -= center.z;
 
-                    document
-                        .querySelectorAll(
-                            ".color"
-                        )
-                        .forEach(
-                            b =>
-                                b.classList.remove(
-                                    "active"
+            // placer les roues au niveau du sol
+            const finalBox =
+                new THREE.Box3().setFromObject(
+                    car
+                );
+
+            car.position.y -=
+                finalBox.min.y;
+
+            car.position.y += 0.35;
+
+            // ------------------------------------------------
+            // MATÉRIAUX
+            // ------------------------------------------------
+
+            car.traverse(
+                function(object) {
+
+                    if (
+                        object.isMesh
+                    ) {
+
+                        object.castShadow = true;
+                        object.receiveShadow = true;
+
+                        if (
+                            object.material
+                        ) {
+
+                            // gérer plusieurs matériaux
+                            if (
+                                Array.isArray(
+                                    object.material
                                 )
-                        );
+                            ) {
 
-                    button.classList.add(
-                        "active"
-                    );
+                                object.material =
+                                    object.material.map(
+                                        material =>
+                                            prepareMaterial(
+                                                material
+                                            )
+                                    );
 
-                    changeCarColor(
-                        button.dataset.color
-                    );
+                            } else {
 
+                                object.material =
+                                    prepareMaterial(
+                                        object.material
+                                    );
+                            }
+                        }
+                    }
                 }
             );
 
-        }
-    );
+            // ------------------------------------------------
+            // AJOUT À LA SCÈNE
+            // ------------------------------------------------
 
+            scene.add(car);
 
-/* =========================================================
-   MENU PERSONNALISATION
-========================================================= */
+            // ------------------------------------------------
+            // RÉCUPÉRATION DES MATÉRIAUX DE CARROSSERIE
+            // ------------------------------------------------
 
-const customPanel =
-    document.getElementById(
-        "customPanel"
-    );
+            collectCarMaterials();
 
-document
-    .getElementById("customButton")
-    .addEventListener(
-        "click",
-        () => {
+            // ------------------------------------------------
+            // MASQUER CHARGEMENT
+            // ------------------------------------------------
 
-            customPanel.classList.add(
-                "open"
-            );
-
-        }
-    );
-
-
-document
-    .getElementById("closeCustom")
-    .addEventListener(
-        "click",
-        () => {
-
-            customPanel.classList.remove(
-                "open"
-            );
-
-        }
-    );
-
-
-/* =========================================================
-   CONDUITE
-========================================================= */
-
-document
-    .getElementById("driveButton")
-    .addEventListener(
-        "click",
-        () => {
+            hideLoading();
 
             showNotification(
-                "MODE CONDUITE — BIENTÔT DISPONIBLE"
+                "GOLF R CHARGÉE 🚗"
             );
 
-            camera.position.set(
-                0,
-                3,
-                11
-            );
+            // ------------------------------------------------
+            // POSITION CAMÉRA
+            // ------------------------------------------------
 
             controls.target.set(
                 0,
@@ -1028,24 +820,742 @@ document
                 0
             );
 
+            camera.position.set(
+                5.8,
+                3,
+                6.5
+            );
+
+        },
+
+        function(progress) {
+
+            if (
+                progress.total > 0
+            ) {
+
+                const percent =
+                    Math.round(
+                        (
+                            progress.loaded /
+                            progress.total
+                        ) * 100
+                    );
+
+                console.log(
+                    "Golf :",
+                    percent + "%"
+                );
+            }
+        },
+
+        function(error) {
+
+            console.error(
+                "Impossible de charger GolfR.glb",
+                error
+            );
+
+            console.warn(
+                "ZENTRO utilise le modèle temporaire."
+            );
+
+            createTemporaryGolf();
+
+            hideLoading();
+
+            showNotification(
+                "Modèle temporaire chargé"
+            );
+        }
+    );
+}
+
+// ============================================================
+// PRÉPARATION DES MATÉRIAUX
+// ============================================================
+
+function prepareMaterial(material) {
+
+    if (
+        material &&
+        material.isMeshStandardMaterial
+    ) {
+
+        material.metalness =
+            Math.max(
+                material.metalness,
+                0.25
+            );
+
+        material.roughness =
+            Math.min(
+                material.roughness,
+                0.55
+            );
+    }
+
+    return material;
+}
+
+// ============================================================
+// RÉCUPÉRER LES MATÉRIAUX DE CARROSSERIE
+// ============================================================
+
+function collectCarMaterials() {
+
+    carBodyMaterials = [];
+
+    if (!car) {
+        return;
+    }
+
+    car.traverse(
+        function(object) {
+
+            if (
+                !object.isMesh ||
+                !object.material
+            ) {
+                return;
+            }
+
+            const materials =
+                Array.isArray(
+                    object.material
+                )
+                    ? object.material
+                    : [object.material];
+
+            materials.forEach(
+                function(material) {
+
+                    if (
+                        !material.color
+                    ) {
+                        return;
+                    }
+
+                    const name =
+                        (
+                            object.name +
+                            " " +
+                            material.name
+                        ).toLowerCase();
+
+                    // éviter les roues / vitres / pneus
+                    const forbidden =
+                        [
+                            "wheel",
+                            "tire",
+                            "tyre",
+                            "glass",
+                            "window",
+                            "brake",
+                            "disc",
+                            "light",
+                            "lamp"
+                        ];
+
+                    const isForbidden =
+                        forbidden.some(
+                            word =>
+                                name.includes(
+                                    word
+                                )
+                        );
+
+                    if (
+                        !isForbidden
+                    ) {
+
+                        carBodyMaterials.push(
+                            material
+                        );
+                    }
+                }
+            );
         }
     );
 
+    // éviter les doublons
+    carBodyMaterials =
+        [...new Set(
+            carBodyMaterials
+        )];
 
-/* =========================================================
-   NOTIFICATION
-========================================================= */
+    console.log(
+        "Matériaux carrosserie :",
+        carBodyMaterials.length
+    );
 
-let notificationTimeout;
+    applyCarColor(
+        targetCarColor
+    );
+}
+
+// ============================================================
+// CHANGER LA COULEUR DE LA CARROSSERIE
+// ============================================================
+
+function applyCarColor(color) {
+
+    targetCarColor = color;
+
+    if (
+        carBodyMaterials.length === 0
+    ) {
+        return;
+    }
+
+    carBodyMaterials.forEach(
+        function(material) {
+
+            if (
+                material.color
+            ) {
+
+                material.color.setHex(
+                    color
+                );
+
+                material.metalness = 0.65;
+                material.roughness = 0.2;
+            }
+        }
+    );
+}
+
+// ============================================================
+// MODÈLE TEMPORAIRE
+// ============================================================
+
+function createTemporaryGolf() {
+
+    car =
+        new THREE.Group();
+
+    car.position.y = 0.35;
+
+    // --------------------------------------------------------
+    // CARROSSERIE
+    // --------------------------------------------------------
+
+    const bodyMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x050505,
+            metalness: 0.7,
+            roughness: 0.2
+        });
+
+    const body =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                4.2,
+                0.8,
+                1.8
+            ),
+            bodyMaterial
+        );
+
+    body.position.y = 0.85;
+
+    body.castShadow = true;
+
+    car.add(body);
+
+    carBodyMaterials.push(
+        bodyMaterial
+    );
+
+    // --------------------------------------------------------
+    // TOIT
+    // --------------------------------------------------------
+
+    const roof =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                2.5,
+                0.65,
+                1.55
+            ),
+            bodyMaterial
+        );
+
+    roof.position.set(
+        -0.15,
+        1.45,
+        0
+    );
+
+    roof.castShadow = true;
+
+    car.add(roof);
+
+    // --------------------------------------------------------
+    // VITRES
+    // --------------------------------------------------------
+
+    const glassMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x080d14,
+            metalness: 0.2,
+            roughness: 0.05,
+            transparent: true,
+            opacity: 0.72
+        });
+
+    const windshield =
+        new THREE.Mesh(
+            new THREE.BoxGeometry(
+                1.1,
+                0.5,
+                1.58
+            ),
+            glassMaterial
+        );
+
+    windshield.position.set(
+        0.7,
+        1.46,
+        0
+    );
+
+    windshield.rotation.z =
+        -0.18;
+
+    car.add(windshield);
+
+    // --------------------------------------------------------
+    // ROUES
+    // --------------------------------------------------------
+
+    const wheelMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x090909,
+            metalness: 0.85,
+            roughness: 0.2
+        });
+
+    const tireMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x020202,
+            roughness: 0.9
+        });
+
+    const wheelPositions = [
+        [-1.45, 0.55, 0.92],
+        [-1.45, 0.55, -0.92],
+        [1.45, 0.55, 0.92],
+        [1.45, 0.55, -0.92]
+    ];
+
+    wheelPositions.forEach(
+        function(position) {
+
+            const tire =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.42,
+                        0.42,
+                        0.28,
+                        32
+                    ),
+                    tireMaterial
+                );
+
+            tire.rotation.x =
+                Math.PI / 2;
+
+            tire.position.set(
+                position[0],
+                position[1],
+                position[2]
+            );
+
+            tire.castShadow = true;
+
+            car.add(tire);
+
+            const rim =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.24,
+                        0.24,
+                        0.3,
+                        24
+                    ),
+                    wheelMaterial
+                );
+
+            rim.rotation.x =
+                Math.PI / 2;
+
+            rim.position.set(
+                position[0],
+                position[1],
+                position[2]
+            );
+
+            car.add(rim);
+        }
+    );
+
+    // --------------------------------------------------------
+    // PHARES
+    // --------------------------------------------------------
+
+    const headlightMaterial =
+        new THREE.MeshBasicMaterial({
+            color: 0xffffff
+        });
+
+    const headlightGeometry =
+        new THREE.BoxGeometry(
+            0.25,
+            0.18,
+            0.65
+        );
+
+    const leftHeadlight =
+        new THREE.Mesh(
+            headlightGeometry,
+            headlightMaterial
+        );
+
+    leftHeadlight.position.set(
+        2.08,
+        0.95,
+        0.55
+    );
+
+    car.add(leftHeadlight);
+
+    const rightHeadlight =
+        leftHeadlight.clone();
+
+    rightHeadlight.position.z =
+        -0.55;
+
+    car.add(rightHeadlight);
+
+    // --------------------------------------------------------
+    // ÉCHAPPEMENTS
+    // --------------------------------------------------------
+
+    const exhaustMaterial =
+        new THREE.MeshStandardMaterial({
+            color: 0x303030,
+            metalness: 0.95,
+            roughness: 0.15
+        });
+
+    for (
+        let i = -1;
+        i <= 1;
+        i += 2
+    ) {
+
+        for (
+            let j = -1;
+            j <= 1;
+            j += 2
+        ) {
+
+            const exhaust =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.09,
+                        0.09,
+                        0.25,
+                        16
+                    ),
+                    exhaustMaterial
+                );
+
+            exhaust.rotation.z =
+                Math.PI / 2;
+
+            exhaust.position.set(
+                -2.18,
+                0.65,
+                i * 0.28 + j * 0.08
+            );
+
+            car.add(exhaust);
+        }
+    }
+
+    scene.add(car);
+}
+
+// ============================================================
+// INTERFACE
+// ============================================================
+
+function setupUI() {
+
+    // --------------------------------------------------------
+    // BOUTON PRENDRE LE VOLANT
+    // --------------------------------------------------------
+
+    const driveButton =
+        findElementByText(
+            [
+                "PRENDRE LE VOLANT",
+                "PRENDRE LE VOLANT 🚗"
+            ]
+        );
+
+    if (driveButton) {
+
+        driveButton.addEventListener(
+            "click",
+            function() {
+
+                showNotification(
+                    "Mode conduite bientôt disponible 🚗💨"
+                );
+
+                camera.position.set(
+                    4.5,
+                    2.2,
+                    5.5
+                );
+            }
+        );
+    }
+
+    // --------------------------------------------------------
+    // BOUTON PERSONNALISER
+    // --------------------------------------------------------
+
+    const customizeButton =
+        findElementByText(
+            [
+                "PERSONNALISER",
+                "PERSONNALISER 🎨"
+            ]
+        );
+
+    if (customizeButton) {
+
+        customizeButton.addEventListener(
+            "click",
+            function() {
+
+                openCustomization();
+            }
+        );
+    }
+
+    // --------------------------------------------------------
+    // BOUTONS DE COULEUR
+    // --------------------------------------------------------
+
+    setupColorButtons();
+
+    // --------------------------------------------------------
+    // ESC
+    // --------------------------------------------------------
+
+    document.addEventListener(
+        "keydown",
+        function(event) {
+
+            if (
+                event.key === "Escape"
+            ) {
+
+                closeCustomization();
+            }
+        }
+    );
+}
+
+// ============================================================
+// TROUVER UN ÉLÉMENT PAR SON TEXTE
+// ============================================================
+
+function findElementByText(
+    texts
+) {
+
+    const elements =
+        document.querySelectorAll(
+            "button, a"
+        );
+
+    for (
+        const element of elements
+    ) {
+
+        const text =
+            element.textContent
+                .trim()
+                .toUpperCase();
+
+        for (
+            const wanted of texts
+        ) {
+
+            if (
+                text.includes(
+                    wanted.toUpperCase()
+                )
+            ) {
+
+                return element;
+            }
+        }
+    }
+
+    return null;
+}
+
+// ============================================================
+// BOUTONS COULEURS
+// ============================================================
+
+function setupColorButtons() {
+
+    const selectors = [
+        "[data-color]",
+        "[data-car-color]",
+        ".color-option",
+        ".color-btn"
+    ];
+
+    let buttons = [];
+
+    selectors.forEach(
+        function(selector) {
+
+            document
+                .querySelectorAll(selector)
+                .forEach(
+                    element =>
+                        buttons.push(element)
+                );
+        }
+    );
+
+    buttons =
+        [...new Set(buttons)];
+
+    buttons.forEach(
+        function(button) {
+
+            button.addEventListener(
+                "click",
+                function() {
+
+                    let color =
+                        button.dataset.color ||
+                        button.dataset.carColor;
+
+                    if (
+                        !color
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        typeof color === "string"
+                    ) {
+
+                        color =
+                            color.replace(
+                                "#",
+                                ""
+                            );
+                    }
+
+                    const numericColor =
+                        parseInt(
+                            color,
+                            16
+                        );
+
+                    if (
+                        !Number.isNaN(
+                            numericColor
+                        )
+                    ) {
+
+                        applyCarColor(
+                            numericColor
+                        );
+
+                        showNotification(
+                            "Couleur modifiée ✨"
+                        );
+                    }
+                }
+            );
+        }
+    );
+}
+
+// ============================================================
+// OUVRIR PERSONNALISATION
+// ============================================================
+
+function openCustomization() {
+
+    if (
+        !customizationPanel
+    ) {
+        return;
+    }
+
+    customizationPanel.classList.add(
+        "active"
+    );
+
+    customizationPanel.style.display =
+        "block";
+}
+
+// ============================================================
+// FERMER PERSONNALISATION
+// ============================================================
+
+function closeCustomization() {
+
+    if (
+        !customizationPanel
+    ) {
+        return;
+    }
+
+    customizationPanel.classList.remove(
+        "active"
+    );
+
+    customizationPanel.style.display =
+        "";
+}
+
+// ============================================================
+// NOTIFICATION
+// ============================================================
 
 function showNotification(
     message
 ) {
 
-    const notification =
-        document.getElementById(
-            "notification"
+    if (
+        !notification
+    ) {
+
+        console.log(
+            "ZENTRO:",
+            message
         );
+
+        return;
+    }
 
     notification.textContent =
         message;
@@ -1055,144 +1565,77 @@ function showNotification(
     );
 
     clearTimeout(
-        notificationTimeout
+        notification._timeout
     );
 
-    notificationTimeout =
+    notification._timeout =
         setTimeout(
-            () => {
+            function() {
 
                 notification.classList.remove(
                     "show"
                 );
 
             },
-            2000
+            2500
         );
 }
 
+// ============================================================
+// ÉCRAN DE CHARGEMENT
+// ============================================================
 
-/* =========================================================
-   ESC
-========================================================= */
+function hideLoading() {
 
-window.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Escape"
-        ) {
-
-            customPanel.classList.remove(
-                "open"
-            );
-
-        }
-
+    if (
+        !loadingScreen
+    ) {
+        return;
     }
-);
 
-
-/* =========================================================
-   CHARGEMENT
-========================================================= */
-
-const loading =
-    document.getElementById(
-        "loading"
+    loadingScreen.classList.add(
+        "hidden"
     );
 
-const progress =
-    document.getElementById(
-        "loading-progress"
-    );
+    setTimeout(
+        function() {
 
-const loadingText =
-    document.getElementById(
-        "loading-text"
-    );
-
-let loadingValue = 0;
-
-const loadingInterval =
-    setInterval(
-        () => {
-
-            loadingValue +=
-                Math.random() * 12;
-
-            if (
-                loadingValue >= 100
-            ) {
-
-                loadingValue = 100;
-
-                clearInterval(
-                    loadingInterval
-                );
-
-                loadingText.textContent =
-                    "GARAGE PRÊT";
-
-                setTimeout(
-                    () => {
-
-                        loading.style.opacity =
-                            "0";
-
-                        setTimeout(
-                            () => {
-
-                                loading.remove();
-
-                            },
-                            700
-                        );
-
-                    },
-                    350
-                );
-
-            }
-
-            progress.style.width =
-                `${loadingValue}%`;
+            loadingScreen.style.display =
+                "none";
 
         },
-        100
+        600
+    );
+}
+
+// ============================================================
+// RESIZE
+// ============================================================
+
+function onWindowResize() {
+
+    camera.aspect =
+        window.innerWidth /
+        window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
     );
 
+    renderer.setPixelRatio(
+        Math.min(
+            window.devicePixelRatio,
+            2
+        )
+    );
+}
 
-/* =========================================================
-   RESIZE
-========================================================= */
-
-window.addEventListener(
-    "resize",
-    () => {
-
-        camera.aspect =
-            window.innerWidth /
-            window.innerHeight;
-
-        camera.updateProjectionMatrix();
-
-        renderer.setSize(
-            window.innerWidth,
-            window.innerHeight
-        );
-
-    }
-);
-
-
-/* =========================================================
-   ANIMATION
-========================================================= */
-
-const clock =
-    new THREE.Clock();
+// ============================================================
+// ANIMATION
+// ============================================================
 
 function animate() {
 
@@ -1203,19 +1646,23 @@ function animate() {
     const elapsed =
         clock.getElapsedTime();
 
+    // rotation très légère de la plateforme lumineuse
+    // pour donner de la vie au garage
+    scene.traverse(
+        function(object) {
+
+            if (
+                object.userData &&
+                object.userData.rotateGarage
+            ) {
+
+                object.rotation.y =
+                    elapsed * 0.2;
+            }
+        }
+    );
 
     controls.update();
-
-
-    if (carGroup) {
-
-        carGroup.position.y =
-            Math.sin(
-                elapsed * 1.2
-            ) * 0.012;
-
-    }
-
 
     renderer.render(
         scene,
@@ -1223,4 +1670,27 @@ function animate() {
     );
 }
 
-animate();
+// ============================================================
+// FIN
+// ============================================================
+
+console.log(
+    "===================================="
+);
+
+console.log(
+    "        ZENTRO GARAGE"
+);
+
+console.log(
+    "        Three.js chargé"
+);
+
+console.log(
+    "        Modèle : " +
+    CAR_MODEL_PATH
+);
+
+console.log(
+    "===================================="
+);
