@@ -1,0 +1,139 @@
+```html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ZENTRO Garage</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+
+<body>
+
+    <div id="loading">
+        <div class="loading-logo">ZENTRO</div>
+        <div class="loading-text">INITIALISATION DU GARAGE...</div>
+        <div class="loading-bar">
+            <div id="loading-progress"></div>
+        </div>
+    </div>
+
+    <header class="topbar">
+        <div class="logo">ZENTRO</div>
+
+        <div class="location">
+            GARAGE
+            <span>PERFORMANCE HQ</span>
+        </div>
+
+        <div class="money">
+            <span>CRÉDITS</span>
+            <strong id="money">125 000 €</strong>
+        </div>
+    </header>
+
+    <aside class="car-panel">
+
+        <div class="panel-label">VÉHICULE ACTUEL</div>
+
+        <h1>GOLF R</h1>
+        <div class="edition">2025 • BLACK EDITION</div>
+
+        <div class="stats">
+
+            <div class="stat">
+                <span>PUISSANCE</span>
+                <strong>333 CH</strong>
+            </div>
+
+            <div class="stat">
+                <span>0–100 KM/H</span>
+                <strong>4,6 S</strong>
+            </div>
+
+            <div class="stat">
+                <span>VITESSE MAX</span>
+                <strong>270 KM/H</strong>
+            </div>
+
+            <div class="stat">
+                <span>TRANSMISSION</span>
+                <strong>4MOTION</strong>
+            </div>
+
+        </div>
+
+        <button id="startButton" class="main-button">
+            🚗 PRENDRE LE VOLANT
+        </button>
+
+        <button id="customButton" class="secondary-button">
+            ⚙ PERSONNALISER
+        </button>
+
+    </aside>
+
+    <div id="controls-hint">
+        <span>🖱️ GLISSER</span>
+        <span>MOLETTE • ZOOM</span>
+        <span>ESC • LIBÉRER LA CAMÉRA</span>
+    </div>
+
+    <div id="notification"></div>
+
+    <div id="custom-panel">
+
+        <div class="custom-header">
+            <h2>PERSONNALISATION</h2>
+            <button id="closeCustom">×</button>
+        </div>
+
+        <div class="custom-section">
+            <span>CARROSSERIE</span>
+
+            <div class="color-options">
+                <button class="color black active" data-color="#08090b"></button>
+                <button class="color white" data-color="#eeeeee"></button>
+                <button class="color red" data-color="#b3121c"></button>
+                <button class="color blue" data-color="#0d2e65"></button>
+            </div>
+        </div>
+
+        <div class="custom-section">
+            <span>JANTES</span>
+
+            <div class="option-row">
+                <button class="option active">NOIR</button>
+                <button class="option">ARGENT</button>
+            </div>
+        </div>
+
+        <div class="custom-section">
+            <span>ÉCLAIRAGE</span>
+
+            <div class="option-row">
+                <button class="option active">BLANC</button>
+                <button class="option">BLEU</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="crosshair"></div>
+
+    <script type="module" src="main.js"></script>
+
+</body>
+</html>
+```
